@@ -17,32 +17,39 @@
 package io.appflate.restmock;
 
 import org.hamcrest.Matcher;
+import org.hamcrest.core.AllOf;
+
+import java.util.LinkedList;
+import java.util.List;
 
 import io.appflate.restmock.exceptions.RequestInvocationCountMismatchException;
 import io.appflate.restmock.exceptions.RequestInvocationCountNotEnoughException;
 import io.appflate.restmock.exceptions.RequestNotInvokedException;
+import io.appflate.restmock.utils.RequestMatchers;
 import okhttp3.mockwebserver.RecordedRequest;
 
 /**
  * Created by andrzejchm on 26/04/16.
  */
 public class RequestsVerifier {
-    private static MatchableCallsRequestDispatcher dispatcher;
-
-    private RequestsVerifier() {
-        throw new UnsupportedOperationException();
-    }
-
-    static void init(MatchableCallsRequestDispatcher dispatcher) {
-        RequestsVerifier.dispatcher = dispatcher;
-    }
-
-    public static RequestVerification verifyRequest(Matcher<RecordedRequest> matcher) {
-        return new RequestVerification(matcher);
-    }
 
     public static class RequestVerification {
+
         Matcher<RecordedRequest> matcher;
+
+        /**
+         * @param requestMatcher needed to match the interesting request.
+         * @return how many times the request was invoked
+         */
+        private static int requestInvocationCount(Matcher<RecordedRequest> requestMatcher) {
+            int count = 0;
+            for (RecordedRequest recordedRequest : dispatcher.getRequestHistory()) {
+                if (requestMatcher.matches(recordedRequest)) {
+                    count++;
+                }
+            }
+            return count;
+        }
 
         RequestVerification(Matcher<RecordedRequest> matcher) {
             this.matcher = matcher;
@@ -74,10 +81,7 @@ public class RequestsVerifier {
             }
             int count = requestInvocationCount(matcher);
             if (count < times) {
-                throw new RequestInvocationCountNotEnoughException(matcher,
-                        count,
-                        times,
-                        dispatcher.getRequestHistory());
+                throw new RequestInvocationCountNotEnoughException(matcher, count, times, dispatcher.getRequestHistory());
             }
 
         }
@@ -92,13 +96,9 @@ public class RequestsVerifier {
             int count = requestInvocationCount(matcher);
             if (count != times) {
                 if (count == 0) {
-                    throw new RequestNotInvokedException(matcher,
-                            dispatcher.getRequestHistory());
+                    throw new RequestNotInvokedException(matcher, dispatcher.getRequestHistory());
                 } else {
-                    throw new RequestInvocationCountMismatchException(count,
-                            times,
-                            matcher,
-                            dispatcher.getRequestHistory());
+                    throw new RequestInvocationCountMismatchException(count, times, matcher, dispatcher.getRequestHistory());
                 }
             }
         }
@@ -109,19 +109,104 @@ public class RequestsVerifier {
             }
         }
 
-        /**
-         * @param requestMatcher needed to match the interesting request.
-         * @return how many times the request was invoked
-         */
-        private static int requestInvocationCount(Matcher<RecordedRequest> requestMatcher) {
-            int count = 0;
-            for (RecordedRequest recordedRequest : dispatcher.getRequestHistory()) {
-                if (requestMatcher.matches(recordedRequest)) {
-                    count++;
-                }
-            }
-            return count;
-        }
+    }
 
+    private static MatchableCallsRequestDispatcher dispatcher;
+
+    static void init(MatchableCallsRequestDispatcher dispatcher) {
+        RequestsVerifier.dispatcher = dispatcher;
+    }
+
+    public static RequestVerification verifyRequest(Matcher<RecordedRequest> matcher) {
+        return new RequestVerification(matcher);
+    }
+
+    public static RequestVerification verifyDELETE(Matcher<RecordedRequest> matcher) {
+        return verifyRequest(AllOf.allOf(RequestMatchers.isDELETE(), matcher));
+    }
+
+    public static RequestVerification verifyGET(Matcher<RecordedRequest> matcher) {
+        return verifyRequest(AllOf.allOf(RequestMatchers.isGET(), matcher));
+    }
+
+    public static RequestVerification verifyPATCH(Matcher<RecordedRequest> matcher) {
+        return verifyRequest(AllOf.allOf(RequestMatchers.isPATCH(), matcher));
+    }
+
+    public static RequestVerification verifyPOST(Matcher<RecordedRequest> matcher) {
+        return verifyRequest(AllOf.allOf(RequestMatchers.isPOST(), matcher));
+    }
+
+    public static RequestVerification verifyPUT(Matcher<RecordedRequest> matcher) {
+        return verifyRequest(AllOf.allOf(RequestMatchers.isPUT(), matcher));
+    }
+
+    /**
+     * @param count number of most recent requests to return from the history of requests received by RESTMockServer.
+     * @return List of {@code count}-newest requests received by RESTMockServer (from oldest to newest).
+     */
+    public static List<RecordedRequest> takeLast(int count) {
+        List<RecordedRequest> requestHistory = dispatcher.getRequestHistory();
+        return requestHistory.subList(Math.max(0, requestHistory.size() - count), requestHistory.size());
+    }
+
+    /**
+     * @return Most recent request received by RESTMockServer, or null if there were no recorded requests
+     */
+    public static RecordedRequest takeLast() {
+        List<RecordedRequest> lastRequest = takeLast(1);
+        if (lastRequest.isEmpty()) {
+            return null;
+        } else {
+            return lastRequest.get(0);
+        }
+    }
+
+    /**
+     * @param count number of requests to return from the beginning of the history of requests received by RESTMockServer.
+     * @return List of {@code count}-oldest requests received by RESTMockServer (from oldest to newest).
+     */
+    public static List<RecordedRequest> takeFirst(int count) {
+        List<RecordedRequest> requestHistory = dispatcher.getRequestHistory();
+        return requestHistory.subList(0, Math.min(count, requestHistory.size()));
+    }
+
+    /**
+     * @return Oldest recorded request received by RESTMockServer, or null if there were no recorded requests
+     */
+    public static RecordedRequest takeFirst() {
+        List<RecordedRequest> lastRequest = takeFirst(1);
+        if (lastRequest.isEmpty()) {
+            return null;
+        } else {
+            return lastRequest.get(0);
+        }
+    }
+
+    /**
+     * @param fromIndexInclusive low endpoint (inclusive) of the sublist of requests' history.
+     * @param toIndexExclusive high endpoint (exclusive) of the sublist of requests' history.
+     * @return specified range of requests' history (from oldest to newest).
+     */
+    public static List<RecordedRequest> take(int fromIndexInclusive, int toIndexExclusive) {
+        return dispatcher.getRequestHistory().subList(fromIndexInclusive, toIndexExclusive);
+    }
+
+    /**
+     * @param requestMatcher matcher used to find all relevant requests
+     * @return a list of requests received by RESTMockServer, that match the given {@code requestMatcher} (from oldest to newest).
+     */
+    public static List<RecordedRequest> takeAllMatching(Matcher<RecordedRequest> requestMatcher) {
+        List<RecordedRequest> result = new LinkedList<>();
+        for (RecordedRequest recordedRequest : dispatcher.getRequestHistory()) {
+            if (requestMatcher.matches(recordedRequest)) {
+                result.add(recordedRequest);
+            }
+        }
+        return result;
+    }
+
+    private RequestsVerifier() {
+        throw new UnsupportedOperationException();
     }
 }

@@ -30,13 +30,13 @@ apply plugin: 'android-apt'
 apply from: '../quality_tools/findbugs.gradle'
 
 android {
-    compileSdkVersion 23
-    buildToolsVersion "23.0.3"
+    compileSdkVersion 26
+    buildToolsVersion "25.0.3"
 
     defaultConfig {
         applicationId "io.appflate.restmock.androidsample"
-        minSdkVersion 10
-        targetSdkVersion 23
+        minSdkVersion 14
+        targetSdkVersion 26
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner 'io.appflate.restmock.androidsample.CustomTestRunner'
@@ -55,15 +55,21 @@ android {
     }
 }
 
+configurations.all {
+    resolutionStrategy {
+        force "com.android.support:support-annotations:${supportLibraryVersion}"
+        force "com.squareup.okhttp3:okhttp:${okHttpVersion}"
+    }
+}
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
-    compile 'com.android.support:appcompat-v7:23.3.0'
-    compile 'com.android.support:design:23.3.0'
+    compile "com.android.support:appcompat-v7:${supportLibraryVersion}"
+    compile "com.android.support:design:${supportLibraryVersion}"
     compile 'com.jakewharton:butterknife:7.0.1'
     compile 'com.google.dagger:dagger:2.2'
-    compile 'com.squareup.retrofit2:retrofit:2.0.2'
-    compile 'com.squareup.retrofit2:converter-gson:2.0.2'
-    compile 'com.google.code.gson:gson:2.4'
+    compile 'com.squareup.retrofit2:retrofit:2.1.0'
+    compile 'com.squareup.retrofit2:converter-gson:2.1.0'
+    compile 'com.google.code.gson:gson:2.7'
     compile 'com.google.code.findbugs:annotations:2.0.3'
     provided 'javax.annotation:jsr250-api:1.0'
     apt 'com.google.dagger:dagger-compiler:2.2'
@@ -79,12 +85,27 @@ dependencies {
         exclude group: 'com.android.support', module: 'support-v4'
         exclude module: 'recyclerview-v7'
     }
-    androidTestCompile 'com.android.support:support-annotations:23.3.0'
-    androidTestCompile 'com.android.support:appcompat-v7:23.3.0'
-    androidTestCompile 'com.android.support:design:23.3.0'
+    androidTestCompile "com.android.support:support-annotations:${supportLibraryVersion}"
+    androidTestCompile "com.android.support:appcompat-v7:${supportLibraryVersion}"
+    androidTestCompile "com.android.support:design:${supportLibraryVersion}"
 
     //the most important, RESTMock! :)
     androidTestCompile project(':android')
 
+    testCompile "com.android.support:appcompat-v7:${supportLibraryVersion}"
+    testCompile "com.android.support:design:${supportLibraryVersion}"
     testCompile 'junit:junit:4.12'
+    testCompile 'com.android.support.test.espresso:espresso-core:2.2.2'
+    testCompile('com.android.support.test.espresso:espresso-contrib:2.2.2') {
+        exclude group: 'com.android.support', module: 'appcompat'
+        exclude group: 'com.android.support', module: 'support-v4'
+        exclude module: 'recyclerview-v7'
+    }
+    testCompile "org.robolectric:robolectric:3.2.2"
+
+    testCompile project(':android')
+    testCompile 'org.khronos:opengl-api:gl1.1-android-2.1_r1' //required to resolve robolectric test problems
+    testCompile(project(':core')) {
+        exclude group: 'org.bouncycastle', module: 'bcprov-jdk15on'
+    }
 }

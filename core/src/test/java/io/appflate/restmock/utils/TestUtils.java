@@ -32,31 +32,33 @@ import static org.junit.Assert.assertTrue;
  * Created by andrzejchm on 25/04/16.
  */
 public class TestUtils {
-    private static final RequestBody EMPTY_JSON_BODY = RequestBody.create(MediaType.parse(
-            "application/json; charset=utf-8"), "");
+
+    private static final RequestBody EMPTY_JSON_BODY = RequestBody.create(MediaType.parse("application/json; charset=utf-8"), "");
     private static OkHttpClient okHttpClient = new OkHttpClient();
 
     public static Response get(String path) throws IOException {
         path = normalizePath(path);
-        return executeSync(new Request.Builder().url(RESTMockServer.getUrl() + path).build());
+        return executeSync(requestBuilder().url(RESTMockServer.getUrl() + path).build());
     }
 
     public static Response post(String path) throws IOException {
         path = normalizePath(path);
-        return executeSync(new Request.Builder().url(RESTMockServer.getUrl() + path).method("POST",
-                EMPTY_JSON_BODY).build());
+        return executeSync(requestBuilder().url(RESTMockServer.getUrl() + path).method("POST", EMPTY_JSON_BODY).build());
     }
 
     public static Response put(String path) throws IOException {
         path = normalizePath(path);
-        return executeSync(new Request.Builder().url(RESTMockServer.getUrl() + path).method("PUT",
-                EMPTY_JSON_BODY).build());
+        return executeSync(requestBuilder().url(RESTMockServer.getUrl() + path).method("PUT", EMPTY_JSON_BODY).build());
     }
 
     public static Response delete(String path) throws IOException {
         path = normalizePath(path);
-        return executeSync(new Request.Builder().url(RESTMockServer.getUrl() + path).method("DELETE",
-                null).build());
+        return executeSync(requestBuilder().url(RESTMockServer.getUrl() + path).method("DELETE", null).build());
+    }
+
+    public static Response head(String path) throws IOException {
+        path = normalizePath(path);
+        return executeSync(requestBuilder().url(RESTMockServer.getUrl() + path).method("HEAD", null).build());
     }
 
     private static Response executeSync(Request request) throws IOException {
@@ -67,14 +69,20 @@ public class TestUtils {
         assertResponseWithBodyContains(response, 500, RESTMockServer.RESPONSE_NOT_MOCKED);
     }
 
+    public static void assertNotMockedNoBody(Response response) throws IOException {
+        assertResponseCodeIs(response, 500);
+    }
+
     public static void assertMultipleMatches(Response response) throws IOException {
         assertResponseWithBodyContains(response, 500, RESTMockServer.MORE_THAN_ONE_RESPONSE_ERROR);
 
     }
 
-    public static void assertResponseWithBodyContains(Response response,
-                                                      int code,
-                                                      String body) throws IOException {
+    public static void assertResponseCodeIs(Response response, int code) {
+        assertEquals(code, response.code());
+    }
+
+    public static void assertResponseWithBodyContains(Response response, int code, String body) throws IOException {
         assertEquals(code, response.code());
         assertTrue(response.body().string().contains(body));
     }
@@ -84,5 +92,9 @@ public class TestUtils {
             path = "/" + path;
         }
         return path;
+    }
+
+    private static Request.Builder requestBuilder() {
+        return new Request.Builder().addHeader("Connection", "close");
     }
 }

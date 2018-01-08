@@ -16,16 +16,17 @@
 
 package io.appflate.restmock;
 
-import okhttp3.mockwebserver.Dispatcher;
-import okhttp3.mockwebserver.MockResponse;
-import okhttp3.mockwebserver.RecordedRequest;
-
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.LinkedList;
 import java.util.List;
 
+import okhttp3.mockwebserver.Dispatcher;
+import okhttp3.mockwebserver.MockResponse;
+import okhttp3.mockwebserver.RecordedRequest;
+
 class MatchableCallsRequestDispatcher extends Dispatcher {
+
     private List<MatchableCall> matchableCalls;
     private List<RecordedRequest> requestsHistory = new LinkedList<>();
 
@@ -36,28 +37,53 @@ class MatchableCallsRequestDispatcher extends Dispatcher {
     @Override
     public MockResponse dispatch(RecordedRequest recordedRequest) throws InterruptedException {
         requestsHistory.add(recordedRequest);
-        RESTMockServer.logger.log("-> New Request:\t" + recordedRequest);
-        List<MatchableCall> matchedRequests = getMatchedRequests(recordedRequest);
-        if (matchedRequests.size() == 1) {
-            RESTMockServer.logger.log("<- Response:\t" + matchedRequests.get(0).response);
-            return matchedRequests.get(0).response;
-        } else if (matchedRequests.size() > 1) {
-            String message = prepareTooManyMatchesMessage(recordedRequest, matchedRequests);
-            RESTMockServer.logger.error("<- Response ERROR:\t" + message);
-            return createErrorResponse(
-                    new IllegalStateException(message));
+        RESTMockServer.getLogger().log("-> New Request:\t" + recordedRequest);
+        List<MatchableCall> matchedCalls = getMatchedRequests(recordedRequest);
+        if (matchedCalls.size() == 1) {
+            return onOneResponseMatched(matchedCalls);
+        } else if (matchedCalls.size() > 1) {
+            return onTooManyResponsesMatched(recordedRequest, matchedCalls);
         } else {
-            RESTMockServer.logger.error("<- Response ERROR:\t" + RESTMockServer.RESPONSE_NOT_MOCKED + ": " + recordedRequest);
-            MockResponse mockResponse =
-                    new MockResponse().setResponseCode(500).setBody(RESTMockServer.RESPONSE_NOT_MOCKED);
-            return mockResponse;
+            return onNoResponsesMatched(recordedRequest);
         }
     }
 
-    private String prepareTooManyMatchesMessage(RecordedRequest recordedRequest,
-                                                final List<MatchableCall> matchedRequests) {
-        StringBuilder sb =
-                new StringBuilder(RESTMockServer.MORE_THAN_ONE_RESPONSE_ERROR + recordedRequest + ": ");
+    private MockResponse onOneResponseMatched(List<MatchableCall> matchedRequests) {
+        RESTMockServer.getLogger().log("<- Response:\t" + matchedRequests.get(0).peekResponse());
+        return matchedRequests.get(0).response();
+    }
+
+    private MockResponse onTooManyResponsesMatched(RecordedRequest recordedRequest, List<MatchableCall> matchedRequests) {
+        String message = prepareTooManyMatchesMessage(recordedRequest, matchedRequests);
+        RESTMockServer.getLogger().error("<- Response ERROR:\t" + message);
+        return createErrorResponse(new IllegalStateException(message));
+    }
+
+    private MockResponse onNoResponsesMatched(RecordedRequest recordedRequest) {
+        RESTMockServer.getLogger()
+                .error("<- Response ERROR:\t" + RESTMockServer.RESPONSE_NOT_MOCKED + ": " + recordedRequest
+                               + "\n list of mocked requests:\n" + prepareAllMocksMessage());
+        return createNotMockedResponse(recordedRequest.getMethod());
+    }
+
+    private String prepareAllMocksMessage() {
+        StringBuilder sb = new StringBuilder();
+        for (MatchableCall match : matchableCalls) {
+            sb.append(match.requestMatcher.toString()).append("\n");
+        }
+        return sb.toString();
+    }
+
+    private MockResponse createNotMockedResponse(String httpMethod) {
+        MockResponse mockResponse = new MockResponse().setResponseCode(500);
+        if (!httpMethod.equals("HEAD")) {
+            mockResponse.setBody(RESTMockServer.RESPONSE_NOT_MOCKED);
+        }
+        return mockResponse;
+    }
+
+    private String prepareTooManyMatchesMessage(RecordedRequest recordedRequest, final List<MatchableCall> matchedRequests) {
+        StringBuilder sb = new StringBuilder(RESTMockServer.MORE_THAN_ONE_RESPONSE_ERROR + recordedRequest + ": ");
         for (MatchableCall match : matchedRequests) {
             sb.append(match.requestMatcher.toString()).append("\n");
         }
@@ -85,26 +111,29 @@ class MatchableCallsRequestDispatcher extends Dispatcher {
     }
 
     void addMatchableCall(MatchableCall matchableCall) {
-        RESTMockServer.logger.log("## Adding new response for:\t" + matchableCall.requestMatcher);
-        if (!matchableCalls.contains(matchableCall)) {
-            matchableCalls.add(matchableCall);
+        if (matchableCall.getResponses().size() > 0) {
+            RESTMockServer.getLogger().log("## Adding new response for:\t" + matchableCall.requestMatcher);
+            if (!matchableCalls.contains(matchableCall) && !matchableCall.getResponses().isEmpty()) {
+                matchableCalls.add(matchableCall);
+            }
+        } else {
+            RESTMockServer.getLogger().log("## There were no responses specified for MatchableCall:\t" + matchableCall.requestMatcher);
         }
     }
 
     void removeAllMatchableCalls() {
-        RESTMockServer.logger.log("## Removing all responses");
+        RESTMockServer.getLogger().log("## Removing all responses");
         matchableCalls.clear();
     }
 
     boolean removeMatchableCall(final MatchableCall call) {
-        RESTMockServer.logger.log("## Removing response for:\t" + call.requestMatcher);
+        RESTMockServer.getLogger().log("## Removing response for:\t" + call.requestMatcher);
         return matchableCalls.remove(call);
     }
 
     List<RecordedRequest> getRequestHistory() {
         return requestsHistory;
     }
-
 
     void clearHistoricalRequests() {
         requestsHistory.clear();

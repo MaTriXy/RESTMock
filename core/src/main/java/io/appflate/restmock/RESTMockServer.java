@@ -16,23 +16,22 @@
 
 package io.appflate.restmock;
 
-import okhttp3.mockwebserver.MockWebServer;
-import okhttp3.mockwebserver.RecordedRequest;
-
 import org.hamcrest.Matcher;
 
 import java.io.IOException;
 
 import io.appflate.restmock.logging.NOOpLogger;
 import io.appflate.restmock.logging.RESTMockLogger;
+import okhttp3.mockwebserver.MockWebServer;
+import okhttp3.mockwebserver.RecordedRequest;
 
 import static io.appflate.restmock.utils.RequestMatchers.isDELETE;
 import static io.appflate.restmock.utils.RequestMatchers.isGET;
+import static io.appflate.restmock.utils.RequestMatchers.isHEAD;
 import static io.appflate.restmock.utils.RequestMatchers.isPATCH;
 import static io.appflate.restmock.utils.RequestMatchers.isPOST;
 import static io.appflate.restmock.utils.RequestMatchers.isPUT;
 import static org.hamcrest.core.AllOf.allOf;
-
 
 public class RESTMockServer {
 
@@ -42,20 +41,22 @@ public class RESTMockServer {
     static MatchableCallsRequestDispatcher dispatcher;
     private static String serverBaseUrl;
     private static RESTMockFileParser RESTMockFileParser;
-    static RESTMockLogger logger;
+    private static RESTMockLogger logger = new NOOpLogger();
 
-    public synchronized static void init(RESTMockFileParser RESTMockFileParser,
-                            RESTMockLogger logger) throws IOException {
-        if(RESTMockServer.mockWebServer != null) {
+    public static RESTMockLogger getLogger() {
+        return logger;
+    }
+
+    public synchronized static void init(RESTMockFileParser RESTMockFileParser, RESTMockLogger logger) throws IOException {
+        if (RESTMockServer.mockWebServer != null) {
             RESTMockServer.shutdown();
         }
         RESTMockServer.mockWebServer = new MockWebServer();
-        if (logger == null) {
-            RESTMockServer.logger = new NOOpLogger();
-        } else {
+        if (logger != null) {
             RESTMockServer.logger = logger;
         }
-        RESTMockServer.logger.log("## Starting RESTMock server...");
+
+        RESTMockServer.getLogger().log("## Starting RESTMock server...");
         RESTMockServer.dispatcher = new MatchableCallsRequestDispatcher();
         RESTMockServer.mockWebServer.setDispatcher(dispatcher);
         RESTMockServer.mockWebServer.start();
@@ -63,12 +64,14 @@ public class RESTMockServer {
         RequestsVerifier.init(dispatcher);
 
         RESTMockServer.RESTMockFileParser = RESTMockFileParser;
-        RESTMockServer.logger.log("## RESTMock successfully started!\turl: " + RESTMockServer.serverBaseUrl);
+        RESTMockServer.getLogger().log("## RESTMock successfully started!\turl: " + RESTMockServer.serverBaseUrl);
     }
 
     /**
      * Enables logging for the RESTMock
-     * @param logger a logger that will be responsible for logging. for Android use AndroidLogger from "com.github.andrzejchm.RESTMock:android" dependency
+     *
+     * @param logger a logger that will be responsible for logging. for Android use AndroidLogger from
+     * "com.github.andrzejchm.RESTMock:android" dependency
      */
     public static void enableLogging(RESTMockLogger logger) {
         RESTMockServer.logger = logger;
@@ -81,10 +84,6 @@ public class RESTMockServer {
         RESTMockServer.logger = new NOOpLogger();
     }
 
-    private RESTMockServer() {
-
-    }
-
     /**
      * Use {@link #reset() instead}
      */
@@ -92,6 +91,7 @@ public class RESTMockServer {
     public static void removeAllMatchableCalls() {
         reset();
     }
+
     /**
      * removes all mocks stored in this {@code RESTMockServer} as well as all history requests
      */
@@ -104,7 +104,7 @@ public class RESTMockServer {
      * removes the given {@code MatchableCall} from this {@code RESTMockServer}
      *
      * @param call {@code MatchableCall} to be removed
-     * @return true if the {@code MatchableCall} was successfuly removed, false if it was not found
+     * @return true if the {@code MatchableCall} was successfully removed, false if it was not found
      */
     public static boolean removeMatchableCall(MatchableCall call) {
         return dispatcher.removeMatchableCall(call);
@@ -113,11 +113,10 @@ public class RESTMockServer {
     /**
      * replaces {@code call} with {@code replacement} in this {@code RESTMockServer}
      *
-     * @param call        {@code MatchableCall} to be removed from {@code RESTMockServer}
+     * @param call {@code MatchableCall} to be removed from {@code RESTMockServer}
      * @param replacement {@code MatchableCall} to be added to {@code RESTMockServer}
      */
-    public static void replaceMatchableCall(MatchableCall call,
-                                            MatchableCall replacement) {
+    public static void replaceMatchableCall(MatchableCall call, MatchableCall replacement) {
         removeMatchableCall(call);
         dispatcher.addMatchableCall(replacement);
     }
@@ -138,7 +137,6 @@ public class RESTMockServer {
         dispatcher.addMatchableCall(call);
     }
 
-
     /**
      * Helper method to create MatchableCall that will be matched only for GET requests along with the specified {@code requestMatcher}
      *
@@ -155,7 +153,7 @@ public class RESTMockServer {
      * @param requestMatcher matcher to match a POST request
      * @return {@code MatchableCall} that will match POST requests along with {@code requestMatcher}
      */
-    public static MatchableCall whenPOST(Matcher<RecordedRequest>  requestMatcher) {
+    public static MatchableCall whenPOST(Matcher<RecordedRequest> requestMatcher) {
         return RESTMockServer.whenRequested(allOf(isPOST(), requestMatcher));
     }
 
@@ -165,7 +163,7 @@ public class RESTMockServer {
      * @param requestMatcher matcher to match a PUT request
      * @return {@code MatchableCall} that will match PUT requests along with {@code requestMatcher}
      */
-    public static MatchableCall whenPUT(Matcher<RecordedRequest>  requestMatcher) {
+    public static MatchableCall whenPUT(Matcher<RecordedRequest> requestMatcher) {
         return RESTMockServer.whenRequested(allOf(isPUT(), requestMatcher));
     }
 
@@ -175,7 +173,7 @@ public class RESTMockServer {
      * @param requestMatcher matcher to match a PATCH request
      * @return {@code MatchableCall} that will match PATCH requests along with {@code requestMatcher}
      */
-    public static MatchableCall whenPATCH(Matcher<RecordedRequest>  requestMatcher) {
+    public static MatchableCall whenPATCH(Matcher<RecordedRequest> requestMatcher) {
         return RESTMockServer.whenRequested(allOf(isPATCH(), requestMatcher));
     }
 
@@ -185,8 +183,12 @@ public class RESTMockServer {
      * @param requestMatcher matcher to match a DELETE request
      * @return {@code MatchableCall} that will match DELETE requests along with {@code requestMatcher}
      */
-    public static MatchableCall whenDELETE(Matcher<RecordedRequest>  requestMatcher) {
+    public static MatchableCall whenDELETE(Matcher<RecordedRequest> requestMatcher) {
         return RESTMockServer.whenRequested(allOf(isDELETE(), requestMatcher));
+    }
+
+    public static MatchableCall whenHEAD(Matcher<RecordedRequest> requestMatcher) {
+        return RESTMockServer.whenRequested(allOf(isHEAD(), requestMatcher));
     }
 
     /**
@@ -203,10 +205,15 @@ public class RESTMockServer {
 
     /**
      * Shuts down the instance of RESTMockServer
+     *
      * @throws IOException if something goes wrong while stopping
      */
     public static void shutdown() throws IOException {
         reset();
         mockWebServer.shutdown();
+    }
+
+    private RESTMockServer() {
+
     }
 }
